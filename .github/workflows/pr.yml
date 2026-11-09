@@ -1,0 +1,39 @@
+name: Pull request
+
+# Holds a pull request's description to the checklist in .github/pull_request_template.md
+# (CONTRIBUTING.md says what each line means): what it changes, how it was checked, screenshots
+# for anything a person can see, every box ticked or answered. It runs again when the description
+# is edited. It runs none of the pull request's code: the check comes from the branch the pull
+# request is aimed at, and it only reads.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  description:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # The paths the pull request changes, from GitHub, a renamed file under both its names (the
+      # number is read from the event file, never pasted into the script).
+      - name: List the changed files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          number=$(jq -r .pull_request.number "$GITHUB_EVENT_PATH")
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$number/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changed.txt"
+      - name: Read the description
+        run: node tools/check-pr.js "$GITHUB_EVENT_PATH" "$RUNNER_TEMP/changed.txt"

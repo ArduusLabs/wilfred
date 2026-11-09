@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+  <title>Wilfred</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="root">
+    <section id="board" class="interactive" aria-label="Claude sessions">
+      <header id="board-head" title="Drag to move · Right-click for menu">
+        <span class="wordmark">Wilfred</span>
+        <span id="chips"></span>
+        <button id="fold" aria-label="Hide sessions" title="Hide sessions">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+      </header>
+      <p id="summary" class="interactive"></p>
+      <ol id="rows"></ol>
+      <div id="empty" hidden>No sessions active in the last hours. Quiet day, sir.</div>
+    </section>
+
+    <div id="dock">
+      <div id="bubble" class="interactive" hidden></div>
+      <button id="butler" class="interactive" aria-label="Wilfred" title="Click: show or hide sessions · Drag: move · Right-click: menu">
+        <img id="avatar-img" alt="" hidden>
+        <svg id="avatar-svg" viewBox="0 0 80 80" aria-hidden="true">
+          <!-- Wilfred, an original drawing. Colours live in style.css. -->
+          <defs>
+            <radialGradient id="a-bg" cx="50%" cy="30%" r="75%"><stop offset="0"/><stop offset="1"/></radialGradient>
+            <linearGradient id="a-skin" x1="0" y1="0" x2="0" y2="1"><stop offset="0"/><stop offset="1"/></linearGradient>
+            <linearGradient id="a-hair" x1="0" y1="0" x2="1" y2="1"><stop offset="0"/><stop offset="1"/></linearGradient>
+            <linearGradient id="a-rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0"/><stop offset=".5"/><stop offset="1"/></linearGradient>
+            <clipPath id="a-disc"><circle cx="40" cy="40" r="37"/></clipPath>
+          </defs>
+          <circle cx="40" cy="40" r="37" fill="url(#a-bg)"/>
+          <g clip-path="url(#a-disc)">
+            <g class="figure">
+              <g class="pose" transform="matrix(1.18 0 0 1.18 -7.2 -9)">
+                <!-- tailcoat with peaked lapels, a wing-collar shirt and a bow tie -->
+                <path class="coat" d="M-2 86 C0 68 9 59 22 56.5 L31.5 54.5 L40 76 L48.5 54.5 L58 56.5 C71 59 80 68 82 86 Z"/>
+                <path class="shirt" d="M30 54 L40 72 L50 54 L48 86 L32 86 Z"/>
+                <path class="lapel" d="M22 56.5 C25.5 55.7 28.7 55 31.5 54.5 L40 76 L35.4 78.2 C31.2 73.6 27.8 69.6 26.2 66.4 Z"/>
+                <path class="lapel" d="M58 56.5 C54.5 55.7 51.3 55 48.5 54.5 L40 76 L44.6 78.2 C48.8 73.6 52.2 69.6 53.8 66.4 Z"/>
+                <path class="collar" d="M34.6 54.8 L39.2 58.2 L38 61.6 L33.2 58.4 Z"/>
+                <path class="collar" d="M45.4 54.8 L40.8 58.2 L42 61.6 L46.8 58.4 Z"/>
+                <path class="tie" d="M31 61.6 C31 60.6 31.9 60.1 32.8 60.5 L38.3 63 L38.3 67.6 L32.8 70.1 C31.9 70.5 31 70 31 69 Z"/>
+                <path class="tie" d="M49 61.6 C49 60.6 48.1 60.1 47.2 60.5 L41.7 63 L41.7 67.6 L47.2 70.1 C48.1 70.5 49 70 49 69 Z"/>
+                <rect class="knot" x="37.6" y="62.5" width="4.8" height="5.4" rx="1.7"/>
+                <!-- head -->
+                <rect class="neck" x="35.2" y="48.5" width="9.6" height="9.5" rx="3.2"/>
+                <ellipse class="ear" cx="21.6" cy="38.2" rx="3.4" ry="5"/>
+                <ellipse class="ear" cx="58.4" cy="38.2" rx="3.4" ry="5"/>
+                <ellipse class="ear-in" cx="21.9" cy="38.6" rx="1.6" ry="2.6"/>
+                <ellipse class="ear-in" cx="58.1" cy="38.6" rx="1.6" ry="2.6"/>
+                <path class="face" d="M40 17.5 C50 17.5 57.6 24.5 57.6 35.5 C57.6 46 50.5 57 40 57 C29.5 57 22.4 46 22.4 35.5 C22.4 24.5 30 17.5 40 17.5 Z"/>
+                <path class="burn" d="M23 32.5 L25.8 32.5 L25.3 42.6 L23.4 41.2 Z"/>
+                <path class="burn" d="M57 32.5 L54.2 32.5 L54.7 42.6 L56.6 41.2 Z"/>
+                <path class="hair" d="M22.5 36 C21.2 26 24.8 14.6 40 14.2 C55.2 14.6 58.8 26 57.6 36 C57 29 54.5 24.4 50.4 22.4 C47 25.5 42 23.2 36.4 20.6 C31 22.6 26 27 22.5 36 Z"/>
+                <path class="parting" d="M36.6 20.9 C35.6 19.4 34.8 18.2 34 17.3"/>
+                <path class="hair-shine" d="M38.4 19.2 C41.6 17.6 45.2 17.8 48.6 19.6"/>
+                <g class="cheeks">
+                  <ellipse cx="28.6" cy="42.6" rx="3.2" ry="1.8"/>
+                  <ellipse cx="51.4" cy="42.6" rx="3.2" ry="1.8"/>
+                </g>
+                <g class="brows">
+                  <path d="M28.2 30.2 C30.4 27.2 34.4 26.2 37.8 27.9 C38.3 28.7 37.8 29.5 37 29.3 C34.2 28.5 31.3 29 29 30.9 C28.5 31.2 28 30.8 28.2 30.2 Z"/>
+                  <path d="M51.8 30.2 C49.6 27.2 45.6 26.2 42.2 27.9 C41.7 28.7 42.2 29.5 43 29.3 C45.8 28.5 48.7 29 51 30.9 C51.5 31.2 52 30.8 51.8 30.2 Z"/>
+                </g>
+                <g class="lidlines">
+                  <path d="M30.4 32.4 C31.5 30.9 35 30.8 36.2 32.3"/>
+                  <path d="M43.8 32.3 C45 30.8 48.5 30.9 49.6 32.4"/>
+                </g>
+                <g class="eyes"><g class="pupils">
+                  <ellipse cx="33.3" cy="34.6" rx="2.3" ry="2.7"/>
+                  <ellipse cx="46.7" cy="34.6" rx="2.3" ry="2.7"/>
+                  <circle class="glint" cx="34.1" cy="33.6" r=".8"/>
+                  <circle class="glint" cx="47.5" cy="33.6" r=".8"/>
+                </g></g>
+                <g class="lids">
+                  <path d="M30.5 35.2 Q33.3 37.6 36.1 35.2"/>
+                  <path d="M43.9 35.2 Q46.7 37.6 49.5 35.2"/>
+                </g>
+                <path class="bridge" d="M40.4 33.6 C40.2 36.4 41 38.6 41.4 40.2"/>
+                <ellipse class="nose" cx="40" cy="41.4" rx="2.6" ry="2"/>
+                <path class="mouth" d="M37.2 50.6 Q40 51.7 42.8 50.6"/>
+                <path class="smile" d="M35.8 49.6 Q40 54.4 44.2 49.6 Z"/>
+                <path class="mustache" d="M40 44.4 C37.2 42.5 33.6 43 30.6 45.2 C29 46.4 27.5 46.1 26.6 45 C26.3 47.6 28.6 49 31.4 48.2 C34.6 47.3 37.3 46.3 40 46.4 C42.7 46.3 45.4 47.3 48.6 48.2 C51.4 49 53.7 47.6 53.4 45 C52.5 46.1 51 46.4 49.4 45.2 C46.4 43 42.8 42.5 40 44.4 Z"/>
+              </g>
+            </g>
+          </g>
+          <circle class="bevel" cx="40" cy="40" r="35.6"/>
+          <circle class="frame" cx="40" cy="40" r="37"/>
+        </svg>
+        <span id="badge" hidden></span>
+        <span id="zzz" aria-hidden="true">z<small>z</small></span>
+      </button>
+    </div>
+  </div>
+
+  <template id="row-tpl">
+    <li class="row">
+      <i class="lamp" aria-hidden="true"></i>
+      <span class="state"></span>
+      <span class="title"></span>
+      <span class="proj"></span>
+      <time class="ago"></time>
+      <p class="headline"></p>
+      <p class="step" hidden><b></b><span></span></p>
+      <p class="meta" hidden><span class="model"></span><span class="effort"></span><span class="mode"></span><span class="context"></span></p>
+      <p class="kin"></p>
+      <p class="facts"></p>
+      <p class="detail"></p>
+    </li>
+  </template>
+  <script src="view.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

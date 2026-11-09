@@ -1,0 +1,356 @@
+/* The structure every theme builds on: layout mechanics, the state marks' glyphs, Wilfred's drawing and
+   his moods, motion. No colours or type here beyond the drawing: a theme (src/renderer/themes/*.css, or
+   your own) supplies those, and may restyle anything below. See docs/themes.md. */
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  font: 13px/1.4 var(--sans);
+  color: var(--text);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+
+#root {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  /* Room on every side for the board's shadow and Wilfred's halo, so neither is cut off. */
+  padding: 14px 24px 30px 14px;
+}
+
+#board {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#root.collapsed #board { display: none; }
+
+#board-head { display: flex; align-items: center; cursor: grab; }
+#board-head:active { cursor: grabbing; }
+
+#chips { display: flex; margin-left: auto; min-width: 0; overflow: hidden; }
+.chip { --c: var(--idle); white-space: nowrap; display: inline-flex; align-items: center; font-variant-numeric: tabular-nums; }
+.chip[data-state="needs-you"] { --c: var(--needs); }
+.chip[data-state="failed"] { --c: var(--failed); }
+.chip[data-state="working"] { --c: var(--working); }
+.chip[data-state="new"] { --c: var(--new); }
+
+#fold {
+  flex: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+#fold svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+#rows { list-style: none; margin: 0; padding: 0; max-height: 640px; overflow: hidden auto; }
+#rows::-webkit-scrollbar { width: 0; }
+/* More rows below the fold: fade the bottom edge until the list is scrolled to its end. */
+#rows.overflowing:not(.at-end) {
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 40px), transparent);
+}
+.more { list-style: none; }
+
+#summary { cursor: default; }
+#summary:not([data-id=""]) { cursor: pointer; }
+
+/* ---------- rows: a grid each direction lays out its own way ---------- */
+
+.row { --c: var(--idle); position: relative; display: grid; cursor: pointer; }
+.row[data-state="needs-you"], .row.quiet { --c: var(--needs); }
+.row[data-state="working"] { --c: var(--working); }
+.row[data-state="new"] { --c: var(--new); }
+.row[data-state="failed"] { --c: var(--failed); }
+
+.lamp { grid-area: lamp; display: block; }
+.state { grid-area: state; }
+.title { grid-area: title; }
+.proj { grid-area: proj; }
+/* The time keeps to the right edge however wide its column grows (a family note shares it). */
+.ago { grid-area: ago; justify-self: end; font-variant-numeric: tabular-nums; }
+.headline { grid-area: headline; }
+.step { grid-area: step; }
+.detail { grid-area: detail; }
+
+.title, .headline, .proj, .step span, .state { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.proj:empty { display: none; }
+
+/* A question or a failure is the point of the row: let it run to two lines. */
+.row[data-state="needs-you"] .headline, .row[data-state="failed"] .headline {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.step { display: flex; align-items: center; min-width: 0; }
+.step b { flex: none; font-variant-numeric: tabular-nums; }
+
+.detail {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  transition: max-height 220ms ease, opacity 160ms ease, margin 160ms ease;
+}
+.row:hover .detail:not(:empty) { max-height: 140px; opacity: 1; margin-top: 5px; }
+.row:hover .headline { white-space: normal; }
+/* A tool that has gone quiet needs you for a reason the detail gives ("No progress for 5 min…"): show it. */
+.row.quiet .detail:not(:empty) { max-height: 140px; opacity: 1; margin-top: 3px; }
+
+/* What the session runs on (model, effort, permission mode), its family note, and its facts (branch, usage). */
+.meta { grid-area: meta; display: flex; flex-wrap: wrap; column-gap: 7px; min-width: 0; }
+.meta span:empty { display: none; }
+.meta span { white-space: nowrap; }
+.kin { grid-area: kin; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.facts { grid-area: facts; }
+.kin:empty, .facts:empty { display: none; }
+/* The facts come out with the detail, on hover. */
+.facts {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  overflow-wrap: anywhere;
+  transition: max-height 220ms ease, opacity 160ms ease, margin 160ms ease;
+}
+/* Room for five lines: the branch, the context and the usage rarely fit one. */
+.row:hover .facts:not(:empty) { max-height: 84px; opacity: 1; margin-top: 4px; }
+/* No permission checks at all: that is a warning, in the failure colour. */
+.row.unguarded .mode { color: var(--failed); font-weight: 700; }
+/* The context reading: plain, then amber from half the window, then red past 80% (a compaction is near). */
+.row.filling .context { color: var(--needs); }
+.row.full .context { color: var(--failed); font-weight: 700; }
+/* Starred in the Claude app: a star before the title. Watched: an eye after it. */
+.row.starred .title::before, .row.watched .title::after {
+  content: "";
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  vertical-align: -0.06em;
+  background: var(--star, var(--needs));
+  -webkit-mask: var(--glyph-star) center / contain no-repeat;
+  mask: var(--glyph-star) center / contain no-repeat;
+}
+.row.starred .title::before { margin-right: 0.32em; }
+.row.watched .title::after {
+  margin-left: 0.4em;
+  background: var(--watch, currentColor);
+  opacity: 0.75;
+  -webkit-mask-image: var(--glyph-eye);
+  mask-image: var(--glyph-eye);
+}
+/* A side session sits under the session that started it, with a bracket to show it. */
+.row[data-depth="1"] { margin-left: var(--nest, 22px); }
+.row[data-depth="1"]::after {
+  content: "";
+  position: absolute;
+  left: -13px;
+  top: 0;
+  height: 50%;
+  width: 9px;
+  border-left: 1.5px solid var(--rule, currentColor);
+  border-bottom: 1.5px solid var(--rule, currentColor);
+  border-radius: 0 0 0 6px;
+  opacity: 0.8;
+  pointer-events: none;
+}
+/* Snoozed: still listed, asking for nothing. */
+.row.snoozed { opacity: 0.6; }
+.row.snoozed .lamp, .row.snoozed .lamp::before, .row.snoozed .lamp::after { animation: none; }
+/* Do not disturb: nothing hops, rings or glows until it's over. */
+#root.dnd #butler.alert { animation: none; }
+#root.dnd #butler.alert::before { animation: none; opacity: 0.5; }
+#root.dnd .row[data-state="needs-you"] .lamp, #root.dnd .row[data-state="needs-you"] .lamp::before { animation: none; }
+.chip[data-state="dnd"] { --c: var(--idle); }
+
+/* Glyphs for the state marks, drawn as masks so they take any colour. */
+:root {
+  --glyph-bell: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1.6c-2.4 0-4 1.8-4 4.2v2.6L2.6 11h10.8L12 8.4V5.8c0-2.4-1.6-4.2-4-4.2z'/%3E%3Cpath d='M6.3 12.6a1.8 1.8 0 0 0 3.4 0z'/%3E%3C/svg%3E");
+  --glyph-ask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M5.7 6.1a2.4 2.4 0 1 1 3.6 2.1c-.9.5-1.3 1-1.3 1.9' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='12.6' r='1.2'/%3E%3C/svg%3E");
+  --glyph-done: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.2 8.4l2.5 2.5 5.1-5.6' fill='none' stroke='%23000' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  --glyph-fail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 4v4.9' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='12.2' r='1.25'/%3E%3C/svg%3E");
+  --glyph-bowtie: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 22'%3E%3Cpath d='M1 2.5Q1 1 2.6 1.6L13 6.6V15.4L2.6 20.4Q1 21 1 19.5ZM33 2.5Q33 1 31.4 1.6L21 6.6V15.4L31.4 20.4Q33 21 33 19.5Z'/%3E%3Crect x='13.5' y='6' width='7' height='10' rx='2.6'/%3E%3C/svg%3E");
+  --glyph-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1.4l2 4.3 4.6.5-3.4 3.2.9 4.6L8 11.7l-4.1 2.3.9-4.6L1.4 6.2 6 5.7z'/%3E%3C/svg%3E");
+  --glyph-eye: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 3.2C4.6 3.2 2.1 6 1.2 8c.9 2 3.4 4.8 6.8 4.8s5.9-2.8 6.8-4.8c-.9-2-3.4-4.8-6.8-4.8zm0 7.6a2.8 2.8 0 1 1 0-5.6 2.8 2.8 0 0 1 0 5.6z'/%3E%3Ccircle cx='8' cy='8' r='1.4'/%3E%3C/svg%3E");
+}
+
+/* ---------- butler ---------- */
+
+#dock { display: flex; align-items: flex-end; gap: 10px; }
+
+#butler {
+  position: relative;
+  width: 74px;
+  height: 74px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.38)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
+  transition: transform 160ms ease;
+}
+#butler:hover { transform: translateY(-1px) scale(1.03); }
+#butler:active { cursor: grabbing; }
+#avatar-svg, #avatar-img { width: 74px; height: 74px; display: block; border-radius: 50%; }
+#avatar-img { object-fit: cover; border: 2.5px solid var(--rim, var(--needs)); }
+
+/* A halo in the colour of what's going on: amber when something needs you, green for news. */
+#butler::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+}
+#butler.alert::before { opacity: 1; box-shadow: 0 0 0 2px color-mix(in srgb, var(--needs) 70%, transparent), 0 0 18px 2px color-mix(in srgb, var(--needs) 55%, transparent); animation: halo 1.8s ease-in-out infinite; }
+#butler.happy::before { opacity: 1; box-shadow: 0 0 0 2px color-mix(in srgb, var(--new) 55%, transparent), 0 0 14px color-mix(in srgb, var(--new) 40%, transparent); }
+
+/* Wilfred's drawing: its colours and strokes (the shapes are in index.html; the gradients' stops are
+   coloured here too, so a theme can repaint him; --tie and --tie-knot recolour his bow tie). */
+#a-bg stop:first-child { stop-color: #3b4768; }
+#a-bg stop:last-child { stop-color: #131722; }
+#a-skin stop:first-child { stop-color: #fbe1c9; }
+#a-skin stop:last-child { stop-color: #ecb993; }
+#a-hair stop:first-child { stop-color: #fafaf8; }
+#a-hair stop:last-child { stop-color: #b3b1ac; }
+#a-rim stop:nth-child(1) { stop-color: #f3d58e; }
+#a-rim stop:nth-child(2) { stop-color: #c99a3e; }
+#a-rim stop:nth-child(3) { stop-color: #8a6420; }
+.frame { fill: none; stroke: url(#a-rim); stroke-width: 2.6; }
+.bevel { fill: none; stroke: rgba(255, 255, 255, 0.09); stroke-width: 0.9; }
+.coat { fill: #0f1116; }
+.lapel { fill: #262a35; }
+.shirt { fill: #f7f5f0; }
+.collar { fill: #ffffff; stroke: #d9d6cf; stroke-width: 0.4; }
+.tie { fill: var(--tie, #8d2a36); }
+.knot { fill: var(--tie-knot, #6a1d27); }
+.neck { fill: #e0aa84; }
+.ear { fill: #efbf9c; }
+.ear-in { fill: #d9a07e; }
+.face { fill: url(#a-skin); }
+.burn { fill: #d6d3cd; }
+.hair { fill: url(#a-hair); }
+.parting { fill: none; stroke: #bdbbb6; stroke-width: 0.8; stroke-linecap: round; opacity: 0.8; }
+.hair-shine { fill: none; stroke: #ffffff; stroke-width: 1.5; stroke-linecap: round; opacity: 0.6; }
+.cheeks ellipse { fill: #f19b84; opacity: 0.4; transition: opacity 300ms ease; }
+.brows path { fill: #d2cec6; }
+.lidlines path { fill: none; stroke: #cf9272; stroke-width: 0.8; stroke-linecap: round; opacity: 0.7; }
+.pupils ellipse { fill: #2a2320; }
+.glint { fill: #fff; }
+.lids path { fill: none; stroke: #6b4f3c; stroke-width: 1.5; stroke-linecap: round; }
+.bridge { fill: none; stroke: #dca486; stroke-width: 1.1; stroke-linecap: round; }
+.nose { fill: #e8a98a; }
+.mouth { fill: none; stroke: #9b5e4a; stroke-width: 1.4; stroke-linecap: round; }
+.smile { fill: #8f3f35; stroke: #8f3f35; stroke-width: 1; stroke-linejoin: round; }
+.mustache { fill: #f3f1ec; stroke: #bdb8b0; stroke-width: 0.6; }
+.lids, .smile { opacity: 0; }
+
+.figure, .brows, .eyes, .pupils { transform-box: view-box; transition: transform 300ms ease; }
+.pupils { transform-origin: 40px 34.8px; animation: blink 6s infinite; }
+
+/* moods */
+#butler.working .figure { animation: nod 2.6s ease-in-out infinite; transform-origin: 40px 70px; }
+#butler.working .eyes { animation: glance 4s ease-in-out infinite; }
+#butler.alert { animation: hop 1.1s ease-in-out infinite; }
+#butler.alert .brows { transform: translateY(-2.6px); }
+#butler.alert .eyes { transform: scale(1.12); transform-origin: 40px 35px; }
+#butler.happy .mouth { opacity: 0; }
+#butler.happy .smile { opacity: 1; }
+#butler.happy .cheeks ellipse { opacity: 0.75; }
+#butler.sleep .eyes { opacity: 0; }
+#butler.sleep .pupils { animation: none; }
+#butler.sleep .lids { opacity: 1; }
+#butler.sleep .figure { transform: rotate(-4deg); transform-origin: 40px 70px; }
+
+#zzz {
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  font: italic 700 16px var(--serif, Georgia, serif);
+  color: var(--zzz, var(--text));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+}
+#zzz small { font-size: 11px; }
+#butler.sleep #zzz { animation: drift 3.2s ease-in-out infinite; }
+
+#badge {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  --c: var(--needs);
+  font-variant-numeric: tabular-nums;
+  animation: pop 360ms cubic-bezier(.2, .9, .3, 1.4) both;
+}
+#badge.failed { --c: var(--failed); }
+#badge.new { --c: var(--new); }
+
+/* ---------- speech bubble ---------- */
+
+#bubble {
+  --c: var(--needs);
+  position: relative;
+  max-width: 272px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transform-origin: 100% 100%;
+  animation: bubble-in 340ms cubic-bezier(.2, .9, .3, 1.25) both;
+  transition: transform 140ms ease;
+}
+#bubble[data-mood="alert"] { --c: var(--needs); }
+#bubble[data-mood="happy"] { --c: var(--new); }
+#bubble[data-mood="working"] { --c: var(--working); }
+#bubble[data-mood="sleep"] { --c: var(--idle); }
+#bubble:hover { transform: translateY(-1px); }
+/* While a session is watched: its progress, under Wilfred's words. */
+#bubble .progress { display: block; height: 3px; margin-top: 8px; border-radius: 2px; background: color-mix(in srgb, var(--c) 22%, transparent); }
+#bubble .progress::after { content: ""; display: block; height: 100%; width: calc(var(--done, 0) * 100%); border-radius: 2px; background: var(--c); transition: width 300ms ease; }
+
+/* ---------- motion ---------- */
+
+@keyframes board-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+@keyframes row-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes bubble-in { from { opacity: 0; transform: translate(8px, 6px) scale(0.9); } }
+@keyframes pop { from { transform: scale(0.4); opacity: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes ping { 0% { transform: scale(0.7); opacity: 0.8; } 80%, 100% { transform: scale(1.55); opacity: 0; } }
+@keyframes halo { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes ring { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(14deg); } 30% { transform: rotate(-12deg); } 45% { transform: rotate(8deg); } 60% { transform: rotate(-5deg); } 75% { transform: rotate(0); } }
+@keyframes slide { to { background-position: 40px 0; } }
+@keyframes blink { 0%, 95%, 100% { transform: scaleY(1); } 97% { transform: scaleY(0.1); } }
+@keyframes nod { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(2deg) translateY(0.6px); } }
+@keyframes glance { 0%, 40%, 100% { transform: translateX(0); } 50%, 70% { transform: translateX(1.4px); } }
+@keyframes hop { 0%, 60%, 100% { transform: translateY(0); } 25% { transform: translateY(-7px); } 40% { transform: translateY(-2px); } }
+@keyframes drift { 0% { opacity: 0; transform: translate(0, 4px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(6px, -10px); } }
+
+.row.entering { animation: row-in 300ms cubic-bezier(.2, .9, .3, 1.12) both; }
+
+/* Respect reduced motion for decoration, but keep the small status indicators moving. */
+@media (prefers-reduced-motion: reduce) {
+  #board, .row, .row.entering, #bubble, #badge, .pupils, #butler.alert, #butler.alert::before,
+  #butler.working .figure, #butler.working .eyes, #butler.sleep #zzz, .lamp::before, .lamp::after, .row::before { animation: none; }
+  #butler, #butler:hover, #bubble:hover { transform: none; }
+  #butler.sleep #zzz { opacity: 0.9; }
+}

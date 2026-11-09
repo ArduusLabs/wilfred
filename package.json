@@ -1,0 +1,41 @@
+{
+  "name": "wilfred",
+  "productName": "Wilfred",
+  "version": "0.9.0",
+  "private": true,
+  "description": "An always-on-top butler that shows what every Claude desktop session is doing, at a glance.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "electron",
+    "status",
+    "overlay",
+    "tray"
+  ],
+  "license": "MIT",
+  "author": "ArduusLabs",
+  "homepage": "https://github.com/ArduusLabs/wilfred#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ArduusLabs/wilfred.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ArduusLabs/wilfred/issues"
+  },
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "start": "electron .",
+    "demo": "electron . --demo",
+    "test": "node --test test/*.test.js",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 test/*.test.js",
+    "verify-offline": "electron tools/verify-offline.js",
+    "ui-check": "electron -r ./tools/ui-check.js .",
+    "check-isolation": "node tools/check-isolation.js"
+  },
+  "devDependencies": {
+    "electron": "44.9.3"
+  }
+}

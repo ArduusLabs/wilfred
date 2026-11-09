@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+  <title>Wilfred settings</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div id="win">
+    <header id="bar">
+      <span class="wordmark">Wilfred</span>
+      <span class="bar-title">Settings</span>
+      <button id="close" aria-label="Close" title="Close (Esc)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+    </header>
+
+    <nav id="nav" aria-label="Settings pages">
+      <button data-page="general" class="on">General</button>
+      <button data-page="appearance">Appearance</button>
+      <button data-page="notifications">Notifications</button>
+      <button data-page="today">Today</button>
+      <button data-page="privacy">Privacy</button>
+      <button data-page="about">About</button>
+    </nav>
+
+    <main id="pages">
+      <section id="page-general" class="pane on" aria-labelledby="h-general">
+        <h1 id="h-general">General</h1>
+        <div class="opt">
+          <div class="opt-text"><b>Size</b><span>How big Wilfred and his board are on screen.</span></div>
+          <div class="choices" id="zoom" role="radiogroup" aria-label="Size"></div>
+        </div>
+        <div class="opt">
+          <div class="opt-text"><b>Sessions shown</b><span>Sessions active within this many hours.</span></div>
+          <div class="choices" id="hours" role="radiogroup" aria-label="Sessions shown"></div>
+        </div>
+        <div class="opt">
+          <div class="opt-text"><b id="families-label">Side sessions under their parent</b><span>A session started by another one sits under it, indented, and the family moves together.</span></div>
+          <label class="switch"><input type="checkbox" id="families" aria-labelledby="families-label"><i></i></label>
+        </div>
+        <div class="opt" id="opt-login">
+          <div class="opt-text"><b id="login-label">Start with Windows</b><span>Wilfred starts when you sign in.</span></div>
+          <label class="switch"><input type="checkbox" id="login" aria-labelledby="login-label"><i></i></label>
+        </div>
+        <div class="opt" id="opt-dock" hidden>
+          <div class="opt-text"><b id="dock-label">Show Wilfred in the Dock</b><span>A Dock icon with his menu and a count of what needs you. With it on, the board can't float over full-screen apps.</span></div>
+          <label class="switch"><input type="checkbox" id="dock" aria-labelledby="dock-label"><i></i></label>
+        </div>
+        <div class="opt" id="opt-launcher" hidden>
+          <div class="opt-text"><b>App menu</b><span id="launcher-state">Wilfred isn't in your app menu yet.</span></div>
+          <div class="acts tight">
+            <button class="act" id="launcher-add" data-act="install-launcher">Add to app menu</button>
+            <button class="act" id="launcher-remove" data-act="remove-launcher" hidden>Remove</button>
+          </div>
+        </div>
+        <div class="opt">
+          <div class="opt-text"><b>Position</b><span>Put Wilfred back in the bottom-right corner of your main screen.</span></div>
+          <button class="act" data-act="reset-position">Reset position</button>
+        </div>
+        <h2>Keyboard shortcuts</h2>
+        <div class="opt">
+          <div class="opt-text"><b>Show or hide the board</b><span>Works in any app. Off until you choose one.</span><span class="problem" id="sc-toggle-problem" hidden>Another app has this one; choose a different combination.</span></div>
+          <span class="pick-wrap"><select class="pick" id="sc-toggle" aria-label="Shortcut: show or hide the board"></select></span>
+        </div>
+        <div class="opt">
+          <div class="opt-text"><b>Open the session that needs you most</b><span>The first one waiting for you; failing that, one that failed; failing that, the last one finished; failing that, Claude itself.</span><span class="problem" id="sc-open-problem" hidden>Another app has this one; choose a different combination.</span></div>
+          <span class="pick-wrap"><select class="pick" id="sc-open" aria-label="Shortcut: open the session that needs you most"></select></span>
+        </div>
+      </section>
+
+      <section id="page-appearance" class="pane" aria-labelledby="h-appearance">
+        <h1 id="h-appearance">Appearance</h1>
+        <div class="opt">
+          <div class="opt-text"><b>Light or dark</b><span>Every theme has both; this picks which.</span></div>
+          <div class="choices" id="appearance" role="radiogroup" aria-label="Light or dark"></div>
+        </div>
+        <h2>Theme</h2>
+        <ul id="themes" class="theme-list" role="radiogroup" aria-label="Theme"></ul>
+        <div class="acts">
+          <button class="act" data-act="open-themes-folder">Open themes folder</button>
+          <button class="act" data-act="save-theme-copy">Save current theme as a custom theme</button>
+        </div>
+        <p class="note">The folder holds a copy of each built-in theme. Edit a copy and Wilfred uses your version as you save; copy one under a new name and it's a theme of your own.</p>
+      </section>
+
+      <section id="page-notifications" class="pane" aria-labelledby="h-notifications">
+        <h1 id="h-notifications">Notifications</h1>
+        <p class="note top">Your system's own, shown on this computer only. Click one to open the session.</p>
+        <div class="opt">
+          <div class="opt-text"><b id="n-on-label">Notifications</b><span>Off, Wilfred only hops and rings on his board. The Claude app already shows its own for questions, permissions and finished sessions; Wilfred's add a session that failed, one working for a while and the session you watch, wait half a minute in case you're already there, and keep quiet under do not disturb.</span><span class="problem" id="n-registered" hidden></span></div>
+          <label class="switch"><input type="checkbox" id="n-on" aria-labelledby="n-on-label"><i></i></label>
+        </div>
+        <div class="acts tight">
+          <button class="act" id="n-try" data-act="try-notification" data-done="Sent">Send one now</button>
+        </div>
+        <div id="n-kinds" class="group">
+        <div class="opt">
+          <div class="opt-text"><b id="n-needs-label">When a session needs you</b><span>A question, a plan to approve, or a permission to give.</span></div>
+          <label class="switch"><input type="checkbox" id="n-needs" aria-labelledby="n-needs-label"><i></i></label>
+        </div>
+        <div class="opt">
+          <div class="opt-text"><b id="n-failed-label">When a session fails</b><span>The last turn ended in an error, or the API refused.</span></div>
+          <label class="switch"><input type="checkbox" id="n-failed" aria-labelledby="n-failed-label"><i></i></label>
+        </div>
+        <div class="opt">
+          <div class="opt-text"><b id="n-done-label">When a session finishes</b><span>Its turn is over and nothing waits on you. Off keeps the noise down; a session you watch tells you anyway.</span></div>
+          <label class="switch"><input type="checkbox" id="n-done" aria-labelledby="n-done-label"><i></i></label>
+        </div>
+        <div class="opt">
+          <div class="opt-text"><b>When a session has been working for</b><span>A word when one turn runs long.</span></div>
+          <div class="choices" id="n-long" role="radiogroup" aria-label="Long turn"></div>
+        </div>
+        <div class="opt">
+          <div class="opt-text"><b id="n-text-label">Show the question in the notification</b><span>Off shows only the session's title, for shared screens.</span></div>
+          <label class="switch"><input type="checkbox" id="n-text" aria-labelledby="n-text-label"><i></i></label>
+        </div>
+        <div class="opt">
+          <div class="opt-text"><b id="n-sound-label">Play a sound</b><span>Your system's notification sound.</span></div>
+          <label class="switch"><input type="checkbox" id="n-sound" aria-labelledby="n-sound-label"><i></i></label>
+        </div>
+        <p class="note" id="n-mac-note" hidden>On a Mac, notifications arrive as from "Electron", since Wilfred isn't a packaged app; the first one asks you to allow them.</p>
+        </div>
+        <h2>Do not disturb</h2>
+        <div class="opt">
+          <div class="opt-text"><b>Keep Wilfred quiet</b><span>Nothing hops, rings or notifies until it's over. Also in his menu.</span><span class="problem on" id="dnd-label" hidden></span></div>
+          <div class="choices" id="dnd" role="radiogroup" aria-label="Do not disturb"></div>
+        </div>
+      </section>
+
+      <section id="page-today" class="pane" aria-labelledby="h-today">
+        <h1 id="h-today">Today <small id="today-date"></small></h1>
+        <p class="lead" id="today-line"></p>
+        <div id="today-body">
+          <h2>By project</h2>
+          <table class="day-table" id="today-projects">
+            <thead><tr><th>Project</th><th class="num">Worked</th><th class="num">Waited for you</th><th class="num">Sessions</th><th class="num">Turns</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <h2>Sessions</h2>
+          <table class="day-table" id="today-sessions">
+            <thead><tr><th>Session</th><th class="num">Worked</th><th class="num">Waited for you</th><th class="num">Turns</th><th class="num">At API prices</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="acts">
+          <button class="act" data-act="copy-journal" data-done="Copied">Copy as text</button>
+          <button class="act" data-act="open-journal-folder">Open journal folder</button>
+        </div>
+        <p class="note">Wilfred keeps a journal per day in his settings folder, for 30 days, and only while he runs: time asleep isn't counted. Costs are what the sessions would have cost at API prices, from Claude Code's own figures.</p>
+      </section>
+
+      <section id="page-privacy" class="pane" aria-labelledby="h-privacy">
+        <h1 id="h-privacy">Privacy</h1>
+        <div class="verdict" id="verdict">
+          <i class="verdict-mark" aria-hidden="true"></i>
+          <div><b id="privacy-label"></b><span id="privacy-detail"></span></div>
+        </div>
+        <ul class="fact-list">
+          <li>Reads the Claude app's session files and Claude Code's transcripts. Writes only inside its own settings folder: the settings, the theme copies, and a journal of each day (titles, projects, times and counts).</li>
+          <li>Outside that folder, only what you switch on, removed when you switch it off: the start-at-login entry, the app-menu entry on Linux, and on Windows a Start Menu entry for Wilfred while notifications are on, so that they carry his name. (Electron itself records a notification activator id in the registry the first time one is sent; Wilfred keeps to that one id, and doesn't remove the record. For a downloaded Wilfred.exe, Electron writes the Start Menu entry as well, and it stays.)</li>
+          <li>Changes nothing in Claude: no hooks, no edits to its settings.</li>
+          <li>Notifications are off until you switch them on, and your system's own, on this computer. The "Copy" items put text on your clipboard, on your click.</li>
+          <li>Has no dependencies at run time but Electron itself, pinned to an exact version. A check in the repository fails any change that adds network code.</li>
+        </ul>
+        <div class="opt" id="opt-hidden">
+          <div class="opt-text"><b id="hidden-label">Hide from screen sharing</b><span>Keeps the board out of screen shares and recordings, since it shows prompt text.</span></div>
+          <label class="switch"><input type="checkbox" id="hidden" aria-labelledby="hidden-label"><i></i></label>
+        </div>
+        <p class="note" id="hidden-linux-note" hidden>Hiding the board from screen sharing isn't available on Linux.</p>
+        <div class="acts">
+          <button class="act" data-act="open-security">How it's enforced</button>
+        </div>
+      </section>
+
+      <section id="page-about" class="pane about-page" aria-labelledby="h-about">
+        <img src="../../assets/wilfred-256.png" alt="" width="104" height="104">
+        <h1 id="h-about">Wilfred <small id="version"></small></h1>
+        <p class="tagline">An always-on-top butler who tells you, at a glance, what every Claude session is doing, and which one needs you.</p>
+        <p class="small">An unofficial side project, not affiliated with or endorsed by Anthropic. Open source under the MIT licence.</p>
+        <div class="acts centred">
+          <button class="act" data-act="open-homepage">Project page on GitHub</button>
+        </div>
+        <p class="small"><span id="homepage" class="address"></span></p>
+        <p class="small">Made by ArduusLabs.</p>
+      </section>
+    </main>
+  </div>
+  <script src="view.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

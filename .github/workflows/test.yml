@@ -1,0 +1,89 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  isolation:
+    # Fails any change that could let Wilfred (or its build) send data anywhere. See tools/check-isolation.js.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: node tools/check-isolation.js
+
+  test:
+    needs: isolation
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      # No install scripts run: the tests don't start Electron, so its binary isn't downloaded either.
+      - run: npm ci --ignore-scripts
+      - run: npm run coverage
+
+  ui:
+    # Starts the real app on its demo sessions and looks at it (tools/ui-check.js): the pointer over
+    # the board, folding, Settings from the menu, every theme in light and dark. The pictures it
+    # saves are kept with the run, under Artifacts: a pull request's screenshots can be taken there.
+    needs: isolation
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, experimental: false }
+          # [?] Not yet seen passing on these two systems (Wilfred has only been run on Windows so
+          # far): they report what they find without failing the run, until one has passed.
+          - { os: macos-latest, experimental: true }
+          - { os: ubuntu-latest, experimental: true }
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # Electron's own installer fetches its build for this system and checks it against
+      # node_modules/electron/checksums.json.
+      - run: node node_modules/electron/install.js
+      # bash on every system: PowerShell would swallow the "--" that hands --out to the check.
+      - name: Look at the app
+        if: runner.os != 'Linux'
+        shell: bash
+        run: npm run ui-check -- --out=ui-pictures
+      # [?] A runner has no screen, and Ubuntu 24.04 blocks the sandbox Chromium uses unless the app
+      # has an AppArmor profile (tools/linux-apparmor.sh on a real machine): here the block is lifted
+      # for the run instead, and Wilfred keeps his sandbox.
+      - name: Look at the app (Linux, on a virtual screen)
+        if: runner.os == 'Linux'
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          xvfb-run --auto-servernum npm run ui-check -- --out=ui-pictures
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: ui-pictures-${{ matrix.os }}
+          path: ui-pictures
+          if-no-files-found: warn

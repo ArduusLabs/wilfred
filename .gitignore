@@ -1,0 +1,30 @@
+# Dependencies (each platform installs its own Electron build)
+node_modules/
+
+# Logs and coverage output
+*.log
+npm-debug.log*
+coverage/
+*.lcov
+lcov.info
+
+# Packaged builds, and the pictures of a UI check sent to a folder here
+dist/
+out/
+ui-pictures/
+
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# Local environment
+.env
+.env.*
+
+# Claude Code worktrees and local session files, and browser-automation output
+.claude/
+.bot/

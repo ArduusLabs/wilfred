@@ -1,0 +1,193 @@
+name: Release
+
+# Builds Wilfred for Windows, macOS and Linux and publishes them as a GitHub release, whenever main
+# gets a version (package.json) that has no release yet. A merge that doesn't change the version
+# does nothing. No secrets: the release job uses this run's own token, and only that job may write.
+#
+# Lines marked [?] have not been run on that system yet (the workflow was written and checked on
+# Windows only); the first run on GitHub is their test.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    # A manual run from another branch builds nothing: releases come from main only.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      new: ${{ steps.v.outputs.new }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v$version" --silent 2>/dev/null; then
+            echo "new=false" >> "$GITHUB_OUTPUT"
+            echo "v$version is already released: nothing to do"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+            echo "v$version is new: building it"
+          fi
+
+  build:
+    needs: version
+    if: needs.version.outputs.new == 'true'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { os: windows-latest, platform: win32, arch: x64, label: windows }
+          # [?] rcedit (an x64 program) editing the arm64 Wilfred.exe: it only rewrites resources.
+          - { os: windows-latest, platform: win32, arch: arm64, label: windows }
+          - { os: macos-latest, platform: darwin, arch: arm64, label: macos }
+          - { os: macos-15-intel, platform: darwin, arch: x64, label: macos }
+          - { os: ubuntu-latest, platform: linux, arch: x64, label: linux }
+          - { os: ubuntu-latest, platform: linux, arch: arm64, label: linux }
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      NAME: Wilfred-${{ needs.version.outputs.version }}-${{ matrix.label }}-${{ matrix.arch }}
+      ELECTRON_INSTALL_PLATFORM: ${{ matrix.platform }}
+      ELECTRON_INSTALL_ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node tools/check-isolation.js
+      - run: npm test
+
+      # Electron's own installer fetches its build for ELECTRON_INSTALL_PLATFORM/ARCH and checks it
+      # against node_modules/electron/checksums.json. It skips when a build is there, whatever its
+      # processor, so any is removed first; package-app.js checks the processor of what it finds.
+      - name: Fetch Electron for the target
+        shell: bash
+        run: rm -rf node_modules/electron/dist node_modules/electron/path.txt && node node_modules/electron/install.js
+      - name: Assemble Wilfred
+        shell: bash
+        run: node tools/package-app.js "$ELECTRON_INSTALL_PLATFORM" "$ELECTRON_INSTALL_ARCH" "dist/$NAME"
+
+      # rcedit v2.0.0 (Electron's own tool) sets the name, icon and version that Explorer, Task
+      # Manager and notifications show. Its SHA-256 was taken from the release asset and matches the
+      # copy inside the npm package rcedit@5.0.2; it is not signed, so the hash is the check.
+      - name: Windows - name, icon, version, zip
+        if: matrix.platform == 'win32'
+        shell: pwsh
+        env:
+          RCEDIT_SHA256: 3E7801DB1A5EDBEC91B49A24A094AAD776CB4515488EA5A4CA2289C400EADE2A
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $rcedit = Join-Path $env:RUNNER_TEMP 'rcedit-x64.exe'
+          Invoke-WebRequest https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe -OutFile $rcedit
+          if ((Get-FileHash $rcedit -Algorithm SHA256).Hash -ne $env:RCEDIT_SHA256) { throw 'rcedit-x64.exe checksum mismatch' }
+          & $rcedit "dist/$env:NAME/Wilfred.exe" --set-icon assets/wilfred.ico `
+            --set-version-string ProductName Wilfred --set-version-string FileDescription Wilfred `
+            --set-version-string CompanyName ArduusLabs --set-version-string LegalCopyright 'Copyright (c) ArduusLabs, MIT licence' `
+            --set-version-string OriginalFilename Wilfred.exe --set-version-string InternalName Wilfred `
+            --set-file-version $env:VERSION --set-product-version $env:VERSION
+          if ($LASTEXITCODE -ne 0) { throw "rcedit failed ($LASTEXITCODE)" }
+          $info = (Get-Item "dist/$env:NAME/Wilfred.exe").VersionInfo
+          if ($info.ProductName -ne 'Wilfred') { throw "Wilfred.exe says it is '$($info.ProductName)'" }
+          Compress-Archive -Path "dist/$env:NAME" -DestinationPath "dist/$env:NAME.zip"
+
+      # Not run on a Mac yet: every line here is [?] until the first release shows it working.
+      - name: macOS - bundle name, icon, ad-hoc signature, zip
+        if: matrix.platform == 'darwin'
+        run: |
+          set -euo pipefail
+          APP="dist/$NAME/Wilfred.app"; PB=/usr/libexec/PlistBuddy; PL="$APP/Contents/Info.plist"
+          setkey() { $PB -c "Set :$2 $3" "$1" 2>/dev/null || $PB -c "Add :$2 string $3" "$1"; }
+          mv "$APP/Contents/MacOS/Electron" "$APP/Contents/MacOS/Wilfred"
+          setkey "$PL" CFBundleExecutable Wilfred
+          setkey "$PL" CFBundleName Wilfred
+          setkey "$PL" CFBundleDisplayName Wilfred
+          setkey "$PL" CFBundleIdentifier com.arduuslabs.wilfred
+          setkey "$PL" CFBundleShortVersionString "$VERSION"
+          setkey "$PL" CFBundleVersion "$VERSION"
+          cp assets/wilfred.icns "$APP/Contents/Resources/wilfred.icns"
+          rm -f "$APP/Contents/Resources/electron.icns"
+          setkey "$PL" CFBundleIconFile wilfred.icns
+          # [?] Helper bundle ids under Wilfred's, as electron-builder's helper*BundleId defaults do. The
+          # helpers keep their "Electron Helper" names: Electron looks for those first.
+          for h in "$APP"/Contents/Frameworks/Electron\ Helper*.app; do
+            kind=$(basename "$h" .app | sed -E 's/^Electron Helper ?//; s/[()]//g')
+            setkey "$h/Contents/Info.plist" CFBundleIdentifier "com.arduuslabs.wilfred.helper${kind:+.$kind}"
+          done
+          # [?] --deep is discouraged by Apple for real signing, but is the usual ad-hoc fix: editing
+          # Info.plist broke Electron's signature, and arm64 code must carry one to run at all.
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          # ditto, not zip: it keeps the frameworks' symlinks as links. [?]
+          (cd dist && ditto -c -k --sequesterRsrc --keepParent "$NAME" "$NAME.zip")
+
+      # tar keeps the executable bits (and the launch scripts' ones from git).
+      - name: Linux - tar.gz
+        if: matrix.platform == 'linux'
+        run: tar -C dist -czf "dist/$NAME.tar.gz" "$NAME"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ env.NAME }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    # Only this job may write, and only the repository's contents: the tag and the release.
+    # (A job-level block replaces the workflow's, so download-artifact's read is listed again.)
+    permissions:
+      contents: write
+      actions: read
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums and notes
+        run: |
+          cd dist && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt
+          cat > "$RUNNER_TEMP/notes.md" <<'EOF'
+          These builds are not signed, so each system warns you once.
+
+          **Windows** (`windows-x64`, or `windows-arm64` for Snapdragon PCs): unzip, then run `Wilfred.exe` in the folder. SmartScreen says "Windows protected your PC": choose **More info**, then **Run anyway**.
+
+          **macOS** (`macos-arm64` for Apple silicon, `macos-x64` for Intel): unzip and move `Wilfred.app` to Applications. Open it once; when macOS refuses, go to **System Settings > Privacy & Security** and choose **Open Anyway**. Or, in Terminal: `xattr -dr com.apple.quarantine /Applications/Wilfred.app`.
+
+          **Linux** (`linux-x64` or `linux-arm64`): extract, then run `resources/app/start-wilfred.sh` inside the folder. On Ubuntu 24.04 and later run `resources/app/tools/linux-apparmor.sh` once first (it shows what it installs and asks before it does).
+
+          Check a download with `sha256sum -c SHA256SUMS.txt --ignore-missing`.
+          EOF
+      # gh creates the tag on this commit, uploads everything to a draft and then publishes it.
+      # [?] With both --notes-file and --generate-notes, the notes above should lead GitHub's own list.
+      - name: Publish
+        run: |
+          gh release create "v$VERSION" dist/* \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Wilfred $VERSION" --notes-file "$RUNNER_TEMP/notes.md" --generate-notes

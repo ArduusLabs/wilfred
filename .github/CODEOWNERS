@@ -1,0 +1,14 @@
+# Every change needs a maintainer's review. The files below are what keeps Wilfred offline;
+# a change to any of them gets an especially careful look.
+*                             @ArduusLabs
+
+/src/no-network.js            @ArduusLabs
+/src/main.js                  @ArduusLabs
+/src/preload.js               @ArduusLabs
+/src/renderer/index.html      @ArduusLabs
+/tools/check-isolation.js     @ArduusLabs
+/tools/verify-offline.js      @ArduusLabs
+/security/                    @ArduusLabs
+/package.json                 @ArduusLabs
+/package-lock.json            @ArduusLabs
+/.github/                     @ArduusLabs

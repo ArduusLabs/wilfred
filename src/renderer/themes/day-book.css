@@ -1,0 +1,224 @@
+/* Day book: typography on paper, Wilfred's line as the heading, the state as a word in the margin.
+   A theme is one file like this, applied over style.css; see docs/themes.md. */
+
+:root {
+  --panel: #262420;
+  --panel-edge: rgba(255, 244, 220, 0.12);
+  --row-hover: rgba(255, 244, 220, 0.05);
+  --rule: rgba(255, 244, 220, 0.14);
+  --text: #ece6d8;
+  --soft: #cdc5b3;
+  --muted: #978e7b;
+  --needs: #f3a93c;
+  --failed: #ff6e5c;
+  --working: #7fb2ff;
+  --new: #65d396;
+  --idle: #7b7366;
+  --zzz: var(--muted);
+  --serif: "Sitka Text", "Sitka Small", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --serif-display: "Sitka Heading", "Sitka Subheading", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --sans: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --display: "Segoe UI Variable Display", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --panel: #f7f6f1;
+    --panel-edge: rgba(40, 35, 25, 0.16);
+    --row-hover: rgba(40, 35, 25, 0.045);
+    --rule: rgba(40, 35, 25, 0.14);
+    --text: #1f1c18;
+    --soft: #4a453d;
+    --muted: #706a5e;
+    --needs: #a95d00;
+    --failed: #b9392b;
+    --working: #2857c7;
+    --new: #1b7a49;
+    --idle: #8f897d;
+  }
+}
+
+#board, #bubble {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35), 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+#board {
+  border-radius: 14px;
+  transform-origin: 90% 100%;
+  animation: board-in 260ms cubic-bezier(.2, .9, .3, 1.1) both;
+}
+
+#board-head { gap: 10px; padding: 12px 10px 0 18px; }
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: italic 600 15px/1 var(--serif-display);
+  color: var(--muted);
+}
+.wordmark::before {
+  content: "";
+  flex: none;
+  width: 13px;
+  height: 9px;
+  margin-top: 2px;
+  background: var(--muted);
+  -webkit-mask: var(--glyph-bowtie) center / contain no-repeat;
+  mask: var(--glyph-bowtie) center / contain no-repeat;
+}
+#chips { gap: 10px; }
+.chip { gap: 5px; font: 600 11px/16px var(--sans); color: var(--c); }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--c); }
+.chip[data-state="dnd"] { font-style: italic; font-weight: 500; }
+.chip[data-state="dnd"]::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); }
+#fold { width: 24px; height: 24px; border-radius: 6px; color: var(--muted); }
+#fold:hover { background: var(--row-hover); color: var(--text); }
+#fold svg { width: 13px; height: 13px; }
+
+/* Wilfred's line, set like the first line of a page */
+#summary {
+  padding: 8px 18px 12px;
+  font: italic 400 19px/1.3 var(--serif-display);
+  color: var(--text);
+  border-bottom: 1px solid var(--rule);
+  margin: 0 0 6px;
+}
+#summary b { font-style: normal; font-weight: 700; }
+#summary:not([data-id=""]):hover b { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+
+#rows { padding: 2px 0 10px; }
+.more { padding: 6px 18px 2px 110px; font: italic 12.5px var(--serif); color: var(--muted); }
+#empty { padding: 4px 18px 20px; font: italic 15px/1.4 var(--serif); color: var(--muted); }
+
+/* rows: a margin column with the state, then the entry */
+/* The margin holds the state and, under it, the project, like the account column of a ledger. */
+.row {
+  grid-template-columns: 12px 82px 1fr auto;
+  grid-template-areas:
+    "lamp state title ago"
+    "lamp proj headline headline"
+    ". . step step"
+    ". . meta meta"
+    ". . kin kin"
+    ". . facts facts"
+    ". . detail detail";
+  column-gap: 8px;
+  padding: 8px 16px 9px 10px;
+  transition: background 140ms ease;
+}
+.row + .row { margin-top: 1px; }
+.row:hover { background: var(--row-hover); }
+
+/* a line of small print under the entry: what the session runs on, and its family at the right */
+.meta { margin-top: 3px; font: 500 10.5px/15px var(--sans); color: var(--muted); }
+.meta span:not(:empty):has(~ span:not(:empty))::after { content: "·"; display: inline-block; margin-left: 7px; opacity: 0.7; color: var(--muted); font-weight: 500; }
+.kin { margin-top: 1px; font: italic 11.5px/15px var(--serif); color: var(--muted); }
+.facts { font: 11px/15px var(--sans); color: var(--muted); }
+/* a side session: a lighter entry with a narrower margin, indented under its parent, bracketed in the rule colour */
+.row[data-depth="1"] { --nest: 18px; --rule: var(--panel-edge); grid-template-columns: 12px 64px 1fr auto; }
+.row[data-depth="1"] .title { font-size: 14px; }
+.row[data-depth="1"] .state { font-size: 10.5px; }
+/* a watched session's eye, and the star, in the margin's colour */
+.row { --star: var(--needs); --watch: var(--working); }
+
+/* a bracket in the margin for whatever calls for you */
+.row[data-state="needs-you"]::before, .row[data-state="failed"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 4px;
+  border-radius: 0 3px 3px 0;
+  background: var(--c);
+}
+
+.state { align-self: start; padding-top: 4px; font: 700 11px/1.2 var(--sans); color: var(--c); letter-spacing: 0.01em; }
+.row[data-state="idle"] .state { color: var(--idle); font-weight: 600; }
+.title { font: 700 15.5px/1.3 var(--serif); color: var(--text); }
+.row[data-state="idle"] .title { font-weight: 600; color: var(--soft); }
+.proj { align-self: start; padding-top: 3px; font: 500 10.5px/1.3 var(--sans); color: var(--muted); }
+.ago { align-self: baseline; margin-left: 8px; font: 500 11px var(--sans); color: var(--muted); }
+
+.headline { margin-top: 1px; font: 400 14px/1.35 var(--serif); color: var(--soft); }
+.row[data-state="needs-you"] .headline, .row[data-state="failed"] .headline { font-weight: 600; color: color-mix(in srgb, var(--c) 60%, var(--text)); }
+.row[data-state="idle"] .headline { color: var(--muted); }
+.row.transitional .headline { font-style: italic; color: var(--muted); }
+
+.step { position: relative; margin-top: 5px; padding-bottom: 7px; gap: 7px; font: 500 11.5px var(--sans); color: var(--muted); }
+.step b { font: 700 10.5px/16px var(--sans); color: var(--c); }
+.step::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background:
+    var(--c) 0 0 / calc(var(--done, 0) * 100%) 100% no-repeat,
+    color-mix(in srgb, var(--c) 20%, transparent);
+}
+.detail { font: 12.5px/1.4 var(--serif); color: var(--muted); }
+
+/* marks in the margin: a pulse for a call, a spinner for work */
+.lamp { align-self: start; width: 9px; height: 9px; margin-top: 7px; margin-left: 2px; border-radius: 50%; background: var(--c); }
+.lamp::before { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1.5px solid var(--c); opacity: 0; }
+.lamp { position: relative; }
+.row[data-state="needs-you"] .lamp::before { animation: ping 1.8s ease-out infinite; }
+.row.quiet .lamp::before { animation-duration: 2.8s; }
+.row[data-state="idle"] .lamp { background: transparent; box-shadow: inset 0 0 0 1.5px var(--idle); }
+.row[data-state="new"] .lamp { -webkit-mask: none; }
+.row[data-state="working"] .lamp {
+  width: 11px;
+  height: 11px;
+  margin-top: 6px;
+  margin-left: 1px;
+  background: conic-gradient(from 0deg, transparent 0 10%, color-mix(in srgb, var(--c) 35%, transparent) 35%, var(--c) 92%, transparent 92.5%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.4px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.4px), #000 calc(100% - 2px));
+  animation: spin 1s linear infinite;
+}
+.row[data-state="working"].background .lamp {
+  background: repeating-conic-gradient(var(--c) 0 16deg, transparent 16deg 45deg);
+  animation-duration: 4s;
+}
+.row.transitional .lamp { animation-duration: 2.4s; opacity: 0.6; }
+
+/* butler */
+.frame { stroke: var(--panel-edge); stroke-width: 2; }
+#badge { background: var(--c); color: #fff; font: 700 12px/22px var(--display); box-shadow: 0 0 0 2px var(--panel); }
+#badge.new { color: #0f2a1c; }
+@media (prefers-color-scheme: dark) { #badge { color: #1b1408; } #badge.failed { color: #fff; } }
+
+/* bubble: a slip of paper */
+#bubble {
+  padding: 10px 14px 11px;
+  border-radius: 12px 12px 4px 12px;
+  font: italic 400 15px/1.35 var(--serif-display);
+  color: var(--text);
+}
+#bubble b { font-style: normal; font-weight: 700; }
+#bubble::after {
+  content: "";
+  position: absolute;
+  right: -7px;
+  bottom: 8px;
+  width: 12px;
+  height: 12px;
+  background: var(--panel);
+  border-right: 1px solid var(--panel-edge);
+  border-bottom: 1px solid var(--panel-edge);
+  border-radius: 0 0 3px 0;
+  transform: rotate(-45deg);
+}
+#bubble::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 9px;
+  bottom: 9px;
+  width: 4px;
+  border-radius: 0 3px 3px 0;
+  background: var(--c);
+}
