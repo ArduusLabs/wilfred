@@ -146,6 +146,14 @@ function renderNotifications() {
   kinds.inert = !on;
   kinds.classList.toggle('dim', !on);
   $('#n-try').disabled = !on;
+  // The system refused the last one: say so here, not only in the log.
+  const refused = $('#n-refused');
+  refused.hidden = !(on && snap.notifyRefused);
+  refused.textContent = snap.notifyRefused
+    ? (snap.platform === 'darwin'
+      ? 'macOS refused the last one: it blocks notifications from apps without a developer signature, and does not ask. Watch the count beside the menu bar icon instead.'
+      : `Your system refused the last one (${snap.notifyRefused}).`)
+    : '';
   // Windows names a notification after the Start Menu entry Wilfred keeps while they're on.
   const reg = $('#n-registered');
   reg.hidden = !(on && snap.platform === 'win32');

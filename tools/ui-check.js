@@ -145,10 +145,14 @@ function colourAt(image, page, point) {
   return [bitmap[at + 2], bitmap[at + 1], bitmap[at]];
 }
 
-/** Resolves once the page has drawn what it now holds: two frames on, or a second if none come. */
+/**
+ * Resolves once the page has drawn what it now holds: its entrance animations finished (a Settings
+ * page fades in over 160ms), then two frames on, or a second if none come.
+ */
 const painted = (win) => run(win, () => new Promise((done) => {
   setTimeout(done, 1000);
-  requestAnimationFrame(() => requestAnimationFrame(() => done()));
+  const finite = document.getAnimations().filter((a) => a.effect?.getComputedTiming().endTime !== Infinity);
+  Promise.allSettled(finite.map((a) => a.finished)).then(() => requestAnimationFrame(() => requestAnimationFrame(() => done())));
 }));
 // The board as it reads and as it is painted, once it has stopped changing: two looks in a row
 // that agree, in what the page says and in the colour under every row measured. (A picture taken

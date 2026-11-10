@@ -87,7 +87,7 @@
         <h1 id="h-notifications">Notifications</h1>
         <p class="note top">Your system's own, shown on this computer only. Click one to open the session.</p>
         <div class="opt">
-          <div class="opt-text"><b id="n-on-label">Notifications</b><span>Off, Wilfred only hops and rings on his board. The Claude app already shows its own for questions, permissions and finished sessions; Wilfred's add a session that failed, one working for a while and the session you watch, wait half a minute in case you're already there, and keep quiet under do not disturb.</span><span class="problem" id="n-registered" hidden></span></div>
+          <div class="opt-text"><b id="n-on-label">Notifications</b><span class="problem" id="n-refused" hidden></span><span>Your system's own, for a failed session, one working for a while and the session you watch. Each waits half a minute in case you're already there, and keeps quiet under do not disturb. Switched off, Wilfred only hops and rings on his board.</span><span class="problem" id="n-registered" hidden></span></div>
           <label class="switch"><input type="checkbox" id="n-on" aria-labelledby="n-on-label"><i></i></label>
         </div>
         <div class="acts tight">
@@ -118,7 +118,7 @@
           <div class="opt-text"><b id="n-sound-label">Play a sound</b><span>Your system's notification sound.</span></div>
           <label class="switch"><input type="checkbox" id="n-sound" aria-labelledby="n-sound-label"><i></i></label>
         </div>
-        <p class="note" id="n-mac-note" hidden>On a Mac, notifications arrive as from "Electron", since Wilfred isn't a packaged app; the first one asks you to allow them.</p>
+        <p class="note" id="n-mac-note" hidden>On a Mac, notifications arrive as from "Electron", since Wilfred isn't a signed app, and recent macOS versions may refuse them without asking: press Send one now to see. The number beside his menu bar icon shows what needs you either way.</p>
         </div>
         <h2>Do not disturb</h2>
         <div class="opt">
