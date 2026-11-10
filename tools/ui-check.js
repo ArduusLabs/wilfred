@@ -56,6 +56,15 @@ async function waitFor(what, test, ms = 20000) {
   }
   throw new Error(`timed out waiting for ${what}`);
 }
+// No verdict here rests on a fixed wait for the app to catch up: a busy machine (a runner, say) is
+// many times slower than a desk, and a wait that is long enough there is wasted everywhere else.
+/** Reads until the reading is good, or for five seconds: what is really wrong is still wrong then. */
+async function until(read, good, ms = 5000) {
+  for (const end = Date.now() + ms; ; await sleep(150)) {
+    const got = await read();
+    if (good(got) || Date.now() > end) return got;
+  }
+}
 
 // What each page logged as an error, by page.
 const errors = { 'index.html': [], 'settings.html': [] };
@@ -103,8 +112,24 @@ async function click(win, selector) {
   win.webContents.sendInputEvent({ type: 'mouseDown', ...at, button: 'left', clickCount: 1 });
   win.webContents.sendInputEvent({ type: 'mouseUp', ...at, button: 'left', clickCount: 1 });
 }
+// Copying a frame off the screen can fail once and work the next time (seen on a Linux runner's
+// virtual screen, on the very first picture), so a picture gets a few tries before the run breaks.
+// A copy that comes back with no pixels counts as a failure too: every colour read off it would be
+// nothing, and nothing is "readable" against nothing.
+const PICTURE_TRIES = 5;
 async function picture(win, name) {
-  const image = await win.webContents.capturePage();
+  let image = null;
+  for (let tries = 1; !image; tries++) {
+    try {
+      image = await win.webContents.capturePage();
+      if (image.isEmpty()) throw new Error('the picture is empty');
+    } catch (e) {
+      image = null;
+      if (tries === PICTURE_TRIES) throw e;
+      console.error(`picture ${name}: try ${tries} failed (${e.message}), trying again`);
+      await sleep(500);
+    }
+  }
   fs.writeFileSync(path.join(out, `${name}.png`), image.toPNG());
   return image;
 }
@@ -118,6 +143,28 @@ function colourAt(image, page, point) {
   const y = Math.round((point.y / page.height) * Math.round(height * scale));
   const at = (y * w + x) * 4;
   return [bitmap[at + 2], bitmap[at + 1], bitmap[at]];
+}
+
+/** Resolves once the page has drawn what it now holds: two frames on, or a second if none come. */
+const painted = (win) => run(win, () => new Promise((done) => {
+  setTimeout(done, 1000);
+  requestAnimationFrame(() => requestAnimationFrame(() => done()));
+}));
+// The board as it reads and as it is painted, once it has stopped changing: two looks in a row
+// that agree, in what the page says and in the colour under every row measured. (A picture taken
+// while a theme is still arriving shows the old paint under the new ink.)
+const LOOKS = 20;
+async function look(board, name) {
+  let last = '';
+  for (let looks = 1; ; looks++) {
+    await painted(board);
+    const seen = await run(board, readBoard);
+    const image = await picture(board, name);
+    const now = JSON.stringify([seen, seen.rows.map((r) => r.inView && colourAt(image, seen.page, r.bare))]);
+    if (now === last || looks === LOOKS) return [seen, image];
+    last = now;
+    await sleep(200);
+  }
 }
 
 // ---- What the pages are asked. These run in the page, so they can use nothing from this file.
@@ -246,51 +293,55 @@ async function main() {
   const steps = [];
   const step = async (label, wanted) => {
     pick(label);
-    await sleep(700);
-    const now = await run(settings, readSettings);
+    await sleep(300);
+    const now = await until(() => run(settings, readSettings), (at) => at.shown === wanted);
     steps.push({ label, wanted, shown: now.shown, reloaded: !now.marked });
   };
   await step('Privacy settings…', 'privacy');
   await step('Day book…', 'today');
   await click(settings, '#nav button[data-page="general"]');
-  await sleep(300);
+  await until(() => run(settings, readSettings), (at) => at.shown === 'general');
   await step('Day book…', 'today'); // the page left through the list, asked for again
   const pages = [];
   const unnamed = [];
   let privacy = '';
   for (const page of await run(settings, () => [...document.querySelectorAll('#nav button')].map((b) => b.dataset.page))) {
     await click(settings, `#nav button[data-page="${page}"]`);
-    await sleep(350);
-    const now = await run(settings, readSettings);
+    const now = await until(() => run(settings, readSettings), (at) => at.shown === page && at.hash === page);
     pages.push({ page, shown: now.shown, hash: now.hash });
     unnamed.push(...now.unnamed);
     privacy = now.privacy;
+    await painted(settings);
     await picture(settings, `settings-${page}`);
   }
 
   // The board in every theme, light and dark, chosen in Settings like anyone would.
   await click(settings, '#nav button[data-page="appearance"]');
-  await sleep(300);
-  const { themes } = await run(settings, readSettings);
+  const { themes } = await until(() => run(settings, readSettings), (at) => at.shown === 'appearance');
+  const themeOn = () => run(board, () => document.documentElement.dataset.theme);
   for (let t = 0; t < themes.length; t++) {
-    await click(settings, `#themes li:nth-child(${t + 1})`);
+    // A theme not already chosen has reached the board once the board names another than before.
+    const card = `#themes li:nth-child(${t + 1})`;
+    const chosen = await run(settings, (sel) => document.querySelector(sel).classList.contains('on'), card);
+    const before = await themeOn();
+    await click(settings, card);
+    if (!chosen) await waitFor(`the ${themes[t]} theme on the board`, async () => (await themeOn()) !== before);
     for (const scheme of SCHEMES) {
-      await click(settings, `#appearance button:nth-child(${scheme === 'light' ? 2 : 3})`);
-      await waitFor(`the ${scheme} scheme`, () => nativeTheme.shouldUseDarkColors === (scheme === 'dark'));
-      await sleep(900);
+      const dark = scheme === 'dark';
+      await click(settings, `#appearance button:nth-child(${dark ? 3 : 2})`);
+      await waitFor(`the ${scheme} scheme`, () => nativeTheme.shouldUseDarkColors === dark);
+      await waitFor(`the ${scheme} scheme on the board`, () => run(board, (d) => matchMedia('(prefers-color-scheme: dark)').matches === d, dark));
       const name = `${slug(themes[t])}-${scheme}`;
       board.webContents.sendInputEvent({ type: 'mouseMove', x: 2, y: 2 });
-      await sleep(400);
       // The list as it opens, then scrolled to its end: each row's small print is measured in
       // whichever of the two shows it whole.
-      const seen = await run(board, readBoard);
-      const views = [[seen, await picture(board, `board-${name}`)]];
+      const views = [await look(board, `board-${name}`)];
+      const seen = views[0][0];
       if (seen.rows.some((r) => !r.inView)) {
         await run(board, scrollRows, true);
-        await sleep(500);
-        views.push([await run(board, readBoard), await picture(board, `board-${name}-end`)]);
+        views.push(await look(board, `board-${name}-end`));
         await run(board, scrollRows, false);
-        await sleep(500);
+        await painted(board);
       }
       seen.rows.forEach((row, i) => {
         const view = views.find(([v]) => v.rows[i].inView);
@@ -301,20 +352,20 @@ async function main() {
       sections.push([`Board, ${themes[t]}, ${scheme}`, judgeBoard({ ...seen, errors: errors['index.html'].splice(0) }, titles)]);
 
       await hover(board, '#rows .row:nth-child(1) .title');
-      await sleep(700);
-      sections[sections.length - 1][1].push(...judgeHover(await run(board, readHover, 0)));
+      const hovered = await until(() => run(board, readHover, 0), (h) => judgeHover(h).every((v) => v.ok));
+      sections[sections.length - 1][1].push(...judgeHover(hovered));
+      await painted(board);
       await picture(board, `board-${name}-hover`);
     }
   }
 
   // Folded away and back, in the last theme shown.
   await click(board, '#fold');
-  await sleep(900);
-  const folded = await run(board, readFold);
+  const folded = await until(() => run(board, readFold), (f) => f.collapsed && f.bubbleShown && f.bubbleText);
+  await sleep(600); // for the picture only: the fold is still closing
   await picture(board, 'board-folded');
   await click(board, '#butler');
-  await sleep(900);
-  const unfolded = await run(board, readFold);
+  const unfolded = await until(() => run(board, readFold), (f) => !f.collapsed && f.rows > 0);
   sections.push(['Folding', judgeFold({ ...folded, collapsedAfter: unfolded.collapsed, rowsAfter: unfolded.rows })]);
   sections.push(['Settings', judgeSettings({ steps, pages, unnamed, privacy, errors: errors['settings.html'] })]);
 

@@ -24,6 +24,7 @@ jobs:
     # A manual run from another branch builds nothing: releases come from main only.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.v.outputs.version }}
       new: ${{ steps.v.outputs.new }}
@@ -60,6 +61,7 @@ jobs:
           - { os: ubuntu-latest, platform: linux, arch: x64, label: linux }
           - { os: ubuntu-latest, platform: linux, arch: arm64, label: linux }
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     env:
       VERSION: ${{ needs.version.outputs.version }}
       NAME: Wilfred-${{ needs.version.outputs.version }}-${{ matrix.label }}-${{ matrix.arch }}
@@ -157,6 +159,7 @@ jobs:
   release:
     needs: [version, build]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Only this job may write, and only the repository's contents: the tag and the release.
     # (A job-level block replaces the workflow's, so download-artifact's read is listed again.)
     permissions:

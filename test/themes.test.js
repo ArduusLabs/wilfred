@@ -213,8 +213,13 @@ test('watchThemes sees a real file change in the themes folder', async () => {
   let resolve;
   const changed = new Promise((r) => { resolve = r; });
   const stop = T.watchThemes(s.userDataDir, resolve, { delayMs: 20, onError: () => {} });
-  fs.writeFileSync(path.join(s.userDataDir, 'themes', 'live.css'), 'two');
+  // A watcher can take a moment to start listening (on a Mac it starts on another thread), and a
+  // write made before that is never reported: one write alone can leave this waiting for ever.
+  const write = () => fs.writeFileSync(path.join(s.userDataDir, 'themes', 'live.css'), 'two');
+  write();
+  const writing = setInterval(write, 50);
   await changed;
+  clearInterval(writing);
   stop();
   assert.equal(T.readTheme('custom/live', s).css, 'two');
   s.done();

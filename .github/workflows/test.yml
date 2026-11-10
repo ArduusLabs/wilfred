@@ -12,6 +12,7 @@ jobs:
   isolation:
     # Fails any change that could let Wilfred (or its build) send data anywhere. See tools/check-isolation.js.
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -28,6 +29,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,16 +47,19 @@ jobs:
     # the board, folding, Settings from the menu, every theme in light and dark. The pictures it
     # saves are kept with the run, under Artifacts: a pull request's screenshots can be taken there.
     needs: isolation
+    name: ui (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         include:
           - { os: windows-latest, experimental: false }
-          # [?] Not yet seen passing on these two systems (Wilfred has only been run on Windows so
-          # far): they report what they find without failing the run, until one has passed.
+          # These two report what they find without failing the run, until each has passed a few
+          # times in a row. macOS passed on its first run. [?] Linux has not passed on a runner yet:
+          # its first run could not copy a frame off the virtual screen.
           - { os: macos-latest, experimental: true }
           - { os: ubuntu-latest, experimental: true }
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     continue-on-error: ${{ matrix.experimental }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

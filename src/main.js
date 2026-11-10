@@ -153,6 +153,7 @@ function start() {
   }
 
   function place() {
+    if (!win) return;
     const { b, workArea } = bounds();
     setBoardBounds(b);
     // The page moved under a still pointer: tell it where the pointer now is, so it can decide
@@ -245,7 +246,7 @@ function start() {
   function setZoom(zoom) {
     state.zoom = zoom;
     saveState();
-    win.webContents.setZoomFactor(zoom);
+    if (win) win.webContents.setZoomFactor(zoom);
     if (ensureVisible()) saveState();
     place();
     applyShape();
@@ -331,7 +332,9 @@ function start() {
   }
 
   // Never show() or focus() the board: it must not take the focus from what you are doing.
+  const shown = () => !!win && win.isVisible();
   function setShown(v) {
+    if (!win) return;
     if (v) win.showInactive();
     else win.hide();
     refreshTrayMenu();
@@ -424,7 +427,7 @@ function start() {
   // Everything else lives in Settings.
   function menuTemplate({ fromTray }) {
     return [
-      ...(fromTray ? [{ label: win.isVisible() ? 'Hide Wilfred' : 'Show Wilfred', click: () => setShown(!win.isVisible()) }] : []),
+      ...(fromTray ? [{ label: shown() ? 'Hide Wilfred' : 'Show Wilfred', click: () => setShown(!shown()) }] : []),
       { label: state.collapsed ? 'Show sessions' : 'Hide sessions', click: () => { setShown(true); setCollapsed(!state.collapsed); } },
       { label: 'Open Claude', click: () => openSession('') },
       { label: 'Copy status as text', click: () => clipboard.writeText(statusText(latestRows, Date.now())) },
@@ -731,7 +734,7 @@ function start() {
     tray.setToolTip(trayTip());
     if (trayWays.ignoreDoubleClick) tray.setIgnoreDoubleClickEvents(true);
     const popMenu = () => tray.popUpContextMenu(Menu.buildFromTemplate(menuTemplate({ fromTray: true })));
-    tray.on('click', (e) => (trayWays.ctrlClickMenu && e && e.ctrlKey ? popMenu() : setShown(!win.isVisible())));
+    tray.on('click', (e) => (trayWays.ctrlClickMenu && e && e.ctrlKey ? popMenu() : setShown(!shown())));
     if (trayWays.rightClick) tray.on('right-click', popMenu);
     refreshTrayMenu();
     updateBadges(true);
@@ -745,6 +748,9 @@ function start() {
       iconPath: asset('wilfred-256.png'),
       preload: path.join(__dirname, 'preload.js'),
     }));
+    // Once the board has closed (on the way out), forget it: timers and messages still on their
+    // way find no window and leave it at that, where a closed one would throw at them.
+    win.on('closed', () => { win = null; });
     win.setAlwaysOnTop(true, 'floating');
     if (isMac) joinAllSpaces();
     protect(win, state.hidden);
@@ -757,7 +763,7 @@ function start() {
     win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
     // Show the window once the page has reported its real height, so the board isn't clipped
     // for a moment; a fallback in case that report never comes.
-    win.once('ready-to-show', () => setTimeout(() => { if (!shownOnce) showFirst(); }, 1500));
+    win.once('ready-to-show', () => setTimeout(() => { if (win && !shownOnce) showFirst(); }, 1500));
     // Nothing in the page should ever navigate or open windows.
     win.webContents.on('will-navigate', (e) => e.preventDefault());
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -1028,7 +1034,7 @@ function start() {
       if (!accel) continue;
       let ok = false;
       try {
-        ok = globalShortcut.register(accel, key === 'toggle' ? () => { if (win) setShown(!win.isVisible()); } : openMostUrgent);
+        ok = globalShortcut.register(accel, key === 'toggle' ? () => setShown(!shown()) : openMostUrgent);
       } catch (e) {
         log('shortcut', accel, e.message);
       }
@@ -1058,12 +1064,18 @@ function start() {
     }
   }
 
+  // What the board's page sends. A page that was mid-send when its window went (on the way out,
+  // say) is not listened to: there is no window left to move, show or answer.
+  const fromBoard = (channel, handle) => ipcMain.on(channel, (...args) => {
+    if (win) handle(...args);
+  });
+
   let drag = null;
-  ipcMain.on('drag-start', () => {
+  fromBoard('drag-start', () => {
     drag = { ...state.anchor };
     applyShape();
   });
-  ipcMain.on('drag-move', (_e, d) => {
+  fromBoard('drag-move', (_e, d) => {
     if (!drag || !d || !Number.isFinite(d.dx) || !Number.isFinite(d.dy)) return;
     state.anchor = { right: drag.right + d.dx, bottom: drag.bottom + d.dy };
     place();
@@ -1078,31 +1090,31 @@ function start() {
     saveState();
     applyShape();
   }
-  ipcMain.on('drag-end', endDrag);
-  ipcMain.on('resize', (_e, h) => {
+  fromBoard('drag-end', endDrag);
+  fromBoard('resize', (_e, h) => {
     if (!validHeight(h)) return;
     cssHeight = h;
     place();
     if (!shownOnce) showFirst();
   });
-  ipcMain.on('hover', (_e, over) => setIgnore(!over));
+  fromBoard('hover', (_e, over) => setIgnore(!over));
   // Linux: the page's interactive rectangles (CSS pixels), sent on every layout change.
-  ipcMain.on('shape', (_e, msg) => {
+  fromBoard('shape', (_e, msg) => {
     if (!isLinux) return;
     const rects = msg && msg.rects;
     if (platform.shapeRects(rects, state.zoom) === null) return;
     shapeCss = rects;
     applyShape();
   });
-  ipcMain.on('open', (_e, id) => openSession(String(id || '')));
-  ipcMain.on('toggle', () => setCollapsed(!state.collapsed));
+  fromBoard('open', (_e, id) => openSession(String(id || '')));
+  fromBoard('toggle', () => setCollapsed(!state.collapsed));
   // A right-click mid-drag swallows the button release; end the drag before the menu opens.
-  ipcMain.on('menu', () => {
+  fromBoard('menu', () => {
     endDrag();
     showMenu();
   });
   // A right-click on a row: what can be done with that session.
-  ipcMain.on('row-menu', (_e, id) => {
+  fromBoard('row-menu', (_e, id) => {
     endDrag();
     const row = latestRows.find((r) => r.id === String(id || ''));
     if (!row) return;
@@ -1134,7 +1146,7 @@ function start() {
     ];
     Menu.buildFromTemplate(template).popup({ window: win });
   });
-  ipcMain.on('ready', () => {
+  fromBoard('ready', () => {
     sentListMax = null;
     place();
     win.webContents.send('collapsed', state.collapsed);
@@ -1152,7 +1164,7 @@ function start() {
     if (command === 'quit') return app.quit();
     if (!win) return;
     if (command === 'settings') return openSettings();
-    if (command === 'toggle') return setShown(!win.isVisible());
+    if (command === 'toggle') return setShown(!shown());
     reassertOverlay();
     setShown(true);
   });
@@ -1250,7 +1262,7 @@ function start() {
       // pointer is (hover looks), so tell it whenever the pointer moved over the board.
       let lastCursor = null;
       setInterval(() => {
-        if (!win || drag || !win.isVisible()) return;
+        if (drag || !shown()) return;
         const c = screen.getCursorScreenPoint();
         if (lastCursor && c.x === lastCursor.x && c.y === lastCursor.y) return;
         lastCursor = c;
