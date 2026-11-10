@@ -328,8 +328,9 @@ platform, and what Wilfred does about each.
 - **What macOS calls him.** The downloaded `Wilfred.app` is called Wilfred everywhere, and its Open at
   login entry runs the app itself. Run from a checkout, he isn't a packaged, signed app: he runs
   inside Electron's own bundle. So Activity Monitor, the permission prompts, the Login Items list and notifications say
-  "Electron". The icon and the About panel are his own. Notifications are best-effort for an
-  unsigned app; the board and the menu-bar count are the reliable signal.
+  "Electron". The icon and the About panel are his own. Notifications are best-effort: recent
+  macOS versions refuse them from an unsigned app without asking (Settings > Notifications says so
+  when that happens), so the board and the menu-bar count are the reliable signal.
 - **Keyboard.** Cmd+C/V/A/Z work in Settings, Cmd+Q quits, Cmd+W closes Settings.
 - `Hide from screen sharing` uses macOS's own window sharing flag; recorders built on
   ScreenCaptureKit may still capture the board.

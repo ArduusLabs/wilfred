@@ -91,6 +91,9 @@ function start() {
   // Snoozes and do not disturb; notifications (once the settings are read); the day book.
   const quiet = new Quiet();
   let notifier = null;
+  // Why the system last refused a notification ('' once one is shown). macOS refuses them from an
+  // app without a developer signature, Electron's own bundle included, without ever asking.
+  let notifyRefused = '';
   let journal = null;
   const journalDir = () => path.join(app.getPath('userData'), 'journal');
   // The rows as the source (or the demo) gives them, and as shown: quieted, the watched one marked.
@@ -592,6 +595,7 @@ function start() {
       launcher: launcherState(),
       notify: state.notify,
       registered: registeredWithWindows(),
+      notifyRefused,
       shortcuts: state.shortcuts,
       shortcutChoices: SHORTCUT_CHOICES.map(([, accel]) => [shortcutLabel(accel, process.platform), accel]),
       shortcutProblems,
@@ -830,7 +834,16 @@ function start() {
     try {
       const note = new Notification({ title: n.title, body: n.body, silent: !state.notify.sound });
       note.on('click', () => { if (n.id) openSession(n.id); else setShown(true); });
-      note.on('failed', (_e, err) => log('notification failed', err));
+      note.on('show', () => {
+        if (!notifyRefused) return;
+        notifyRefused = '';
+        pushSnapshot();
+      });
+      note.on('failed', (_e, err) => {
+        log('notification failed', err);
+        notifyRefused = String(err || 'refused');
+        pushSnapshot();
+      });
       note.show();
       setTimeout(foldElectronShortcut, 3000);
       setTimeout(foldElectronShortcut, 7000);
