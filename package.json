@@ -30,7 +30,7 @@
     "start": "electron .",
     "demo": "electron . --demo",
     "test": "node --test --test-timeout=60000 --test-force-exit test/*.test.js",
-    "coverage": "node --test --test-timeout=60000 --test-force-exit --experimental-test-coverage --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 test/*.test.js",
+    "coverage": "node --test --test-timeout=60000 --test-force-exit --experimental-test-coverage --test-coverage-exclude=test/** --test-coverage-lines=100 --test-coverage-branches=100 --test-coverage-functions=100 test/*.test.js",
     "verify-offline": "electron tools/verify-offline.js",
     "ui-check": "electron -r ./tools/ui-check.js .",
     "check-isolation": "node tools/check-isolation.js"
