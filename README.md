@@ -131,7 +131,7 @@ To start him without a terminal window, use `start-wilfred.cmd` (Windows), `star
 (macOS) or `start-wilfred.sh` (Linux). Running any of them again while he's hidden brings him back.
 To have him start when you sign in, open Settings and switch on **Start with Windows** (**Open at
 login** on a Mac, **Start at login** on Linux). Mac and Linux users: read [Platform support](#platform-support)
-first; neither has been run by the author yet.
+first; Linux hasn't been run by the author yet.
 
 ## Using Wilfred
 
@@ -297,14 +297,19 @@ security policy, and everything it shows is plain text.
 | Platform | Status |
 | --- | --- |
 | Windows 11 | Used daily |
-| macOS | Built from Electron's documentation and other overlay apps' experience, not yet run on a Mac: see below, and please report what you find |
-| Linux | Same: Ubuntu (GNOME, Wayland and X11) and KDE Plasma are the targets; see below |
+| macOS | Run on macOS 27 (Apple silicon), from a checkout and as the downloaded `Wilfred.app`. One known issue: [notifications](#macos). Open at login not tried yet |
+| Linux | Built from Electron's documentation and other overlay apps' experience, not yet run: Ubuntu (GNOME, Wayland and X11) and KDE Plasma are the targets; see below |
 
 [docs/platforms.md](docs/platforms.md) lists what those other overlays ran into, on every
 platform, and what Wilfred does about each.
 
 ### macOS
 
+- **Known issue: no notifications.** macOS doesn't let an app without an Apple developer signature
+  send notifications, and Wilfred isn't signed (neither the downloaded app nor a checkout). It
+  refuses them without asking, and Wilfred never appears under System Settings > Notifications, so
+  there is no switch to turn on. Settings > Notifications in Wilfred says when it happened. Everything
+  else works: the count beside the menu bar icon and the board are how he tells you.
 - **Menu bar first.** Wilfred's icon is a small bow tie in the menu bar (it follows light and dark
   menu bars): click to show or hide him, Ctrl-click or right-click for the menu, and a count appears
   beside it when sessions need you. He has no Dock icon by default: that is what lets the board
@@ -328,9 +333,7 @@ platform, and what Wilfred does about each.
 - **What macOS calls him.** The downloaded `Wilfred.app` is called Wilfred everywhere, and its Open at
   login entry runs the app itself. Run from a checkout, he isn't a packaged, signed app: he runs
   inside Electron's own bundle. So Activity Monitor, the permission prompts, the Login Items list and notifications say
-  "Electron". The icon and the About panel are his own. Notifications are best-effort: recent
-  macOS versions refuse them from an unsigned app without asking (Settings > Notifications says so
-  when that happens), so the board and the menu-bar count are the reliable signal.
+  "Electron". The icon and the About panel are his own.
 - **Keyboard.** Cmd+C/V/A/Z work in Settings, Cmd+Q quits, Cmd+W closes Settings.
 - `Hide from screen sharing` uses macOS's own window sharing flag; recorders built on
   ScreenCaptureKit may still capture the board.
